@@ -10,6 +10,7 @@ import { createOtpSender } from './otp/sender';
 import { RedisSessionStore } from './store/redis';
 import { VerifiedUserRepo } from './store/users';
 import { RateLimiter } from './store/rate';
+import { ipAllowlist } from './middleware/ipAllowlist';
 
 const app = express();
 app.use(express.urlencoded({ extended: true }));
@@ -17,6 +18,7 @@ app.use(express.json());
 app.use(morgan('dev'));
 app.use(helmet());
 app.use(hpp());
+app.use('/ussd', ipAllowlist());
 
 const limiter = rateLimit({ windowMs: 60_000, max: 60 });
 app.use('/ussd', limiter);
@@ -66,7 +68,7 @@ const RESEND_COOLDOWN_SEC = Number(process.env.OTP_RESEND_COOLDOWN_SEC || 60);
 
 app.post('/ussd', async (req, res) => {
 	// Optional secret check and IP allowlist
-	const secret = process.env.USSd_SHARED_SECRET;
+	const secret = process.env.USSD_SHARED_SECRET;
 	if (secret && req.headers['x-ussd-secret'] !== secret) {
 		return res.type('text/plain').send(ussdResponse('Unauthorized', true));
 	}
