@@ -35,6 +35,8 @@ alter table if exists public.products enable row level security;
 alter table if exists public.orders enable row level security;
 alter table if exists public.order_items enable row level security;
 alter table if exists public.order_tracking enable row level security;
+alter table if exists public.group_buys enable row level security;
+alter table if exists public.group_buy_participants enable row level security;
 
 -- 4) Profiles policies
 drop policy if exists "profiles self read" on public.profiles;
@@ -109,4 +111,25 @@ create policy "order_tracking self or staff select" on public.order_tracking for
 drop policy if exists "order_tracking staff write" on public.order_tracking;
 create policy "order_tracking staff write" on public.order_tracking for insert with check (is_staff());
 create policy "order_tracking staff update" on public.order_tracking for update using (is_staff()) with check (is_staff());
+
+-- 9) Group Buys policies
+drop policy if exists "group_buys public read" on public.group_buys;
+create policy "group_buys public read" on public.group_buys for select using (true);
+
+drop policy if exists "group_buys admin manage" on public.group_buys;
+create policy "group_buys admin manage" on public.group_buys for all using (is_admin()) with check (is_admin());
+
+-- Participants: users can read their participation; staff can manage
+drop policy if exists "gb_participants self or staff select" on public.group_buy_participants;
+create policy "gb_participants self or staff select" on public.group_buy_participants for select using (
+  user_id = auth.uid() or is_staff()
+);
+
+drop policy if exists "gb_participants self insert" on public.group_buy_participants;
+create policy "gb_participants self insert" on public.group_buy_participants for insert with check (
+  user_id = auth.uid()
+);
+
+drop policy if exists "gb_participants staff update" on public.group_buy_participants;
+create policy "gb_participants staff update" on public.group_buy_participants for update using (is_staff()) with check (is_staff());
 

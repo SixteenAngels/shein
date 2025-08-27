@@ -3,6 +3,9 @@ import { View, Text, Dimensions, FlatList } from 'react-native';
 import ProductCard, { Product } from '../components/ProductCard';
 import ProductPreviewModal from './ProductPreviewModal';
 import ChatBubble from '../components/ChatBubble';
+import GroupBuyBanner from '../components/GroupBuyBanner';
+import { fetchOpenGroupBuys } from '../services/groupBuy';
+import { useNavigation } from '@react-navigation/native';
 import { useCartStore } from '../store/cart';
 import { fetchProducts } from '../services/products';
 
@@ -11,6 +14,8 @@ export default function HomeScreen() {
   const add = useCartStore((s) => s.add);
   const numColumns = 2;
   const cardWidth = Dimensions.get('window').width / numColumns - 18;
+  const navigation = useNavigation<any>();
+  const [banners, setBanners] = useState<any[]>([]);
 
   const [data, setData] = useState<Product[]>([]);
   useEffect(() => {
@@ -25,6 +30,10 @@ export default function HomeScreen() {
         isGroupBuy: !!r.group_buy_enabled,
       }));
       setData(mapped);
+      try {
+        const gbs = await fetchOpenGroupBuys(5);
+        setBanners(gbs);
+      } catch {}
     })();
   }, []);
 
@@ -44,6 +53,20 @@ export default function HomeScreen() {
           </View>
         )}
         keyExtractor={(item) => item.id}
+        ListHeaderComponent={
+          banners.length ? (
+            <View style={{ paddingHorizontal: 4, paddingBottom: 8 }}>
+              {banners.map((b) => (
+                <GroupBuyBanner
+                  key={b.id}
+                  title={"Group Buy: " + b.product_id}
+                  subtitle={"Ends: " + new Date(b.expires_at).toLocaleString()}
+                  onPress={() => navigation.navigate('GroupBuyDetail', { id: b.id })}
+                />)
+              )}
+            </View>
+          ) : null
+        }
       />
 
       {preview && (

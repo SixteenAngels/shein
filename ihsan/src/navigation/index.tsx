@@ -12,6 +12,8 @@ import AuthNavigator from './AuthNavigator';
 import BuyNowScreen from '../screens/BuyNowScreen';
 import { useAuth } from '../context/AuthProvider';
 import PaystackScreen from '../screens/PaystackScreen';
+import GroupBuyDetailScreen from '../screens/GroupBuyDetailScreen';
+import GroupBuyStartScreen from '../screens/GroupBuyStartScreen';
 
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -47,6 +49,8 @@ export default function RootNavigator() {
           <RootStack.Screen name="Checkout" component={CheckoutScreen} />
           <RootStack.Screen name="BuyNow" component={BuyNowScreen} />
           <RootStack.Screen name="Paystack" component={PaystackScreen} />
+          <RootStack.Screen name="GroupBuyDetail" component={GroupBuyDetailScreen} />
+          <RootStack.Screen name="GroupBuyStart" component={GroupBuyStartScreen} />
         </>
       ) : (
         <RootStack.Screen name="Auth" component={AuthNavigator} />

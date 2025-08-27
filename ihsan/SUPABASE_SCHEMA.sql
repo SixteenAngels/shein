@@ -46,3 +46,28 @@ create table if not exists order_tracking (
   recorded_at timestamptz default now()
 );
 
+-- Group Buy tables
+create table if not exists group_buys (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid references products(id) on delete cascade,
+  creator_user_id uuid references users(id),
+  min_qty int not null,
+  max_qty int not null,
+  tiers jsonb not null, -- e.g. [{"min":5,"max":6,"price":10},{"min":7,"max":8,"price":9}]
+  status text not null default 'open', -- open | successful | failed | closed
+  started_at timestamptz not null default now(),
+  expires_at timestamptz not null, -- dynamic deadline
+  extended_until timestamptz, -- optional extension
+  created_at timestamptz default now()
+);
+
+create table if not exists group_buy_participants (
+  id uuid primary key default gen_random_uuid(),
+  group_buy_id uuid references group_buys(id) on delete cascade,
+  user_id uuid references users(id),
+  quantity int not null,
+  unit_price numeric not null, -- captured at join time based on tier
+  payment_status text not null default 'pending', -- pending | paid | refunded
+  created_at timestamptz default now()
+);
+
