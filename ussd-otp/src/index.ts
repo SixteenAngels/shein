@@ -9,8 +9,11 @@ import { z } from 'zod';
 import { parsePhoneNumber } from 'libphonenumber-js';
 import { createOtpSender } from './otp/sender';
 import { RedisSessionStore } from './store/redis';
+import { MemorySessionStore } from './store/memory';
 import { VerifiedUserRepo } from './store/users';
+import { MemoryVerifiedUserRepo } from './store/usersMemory';
 import { RateLimiter } from './store/rate';
+import { MemoryRateLimiter } from './store/rateMemory';
 // OTP-only service: remove payment imports
 import { ipAllowlist } from './middleware/ipAllowlist';
 
@@ -28,10 +31,11 @@ app.use('/ussd', ipAllowlist());
 const limiter = rateLimit({ windowMs: 60_000, max: 60 });
 app.use('/ussd', limiter);
 
-const store = new RedisSessionStore({ ttlMs: 5 * 60_000 });
-const users = new VerifiedUserRepo();
+const useMemory = !process.env.REDIS_URL;
+const store = useMemory ? new MemorySessionStore({ ttlMs: 5 * 60_000 }) : new RedisSessionStore({ ttlMs: 5 * 60_000 });
+const users = useMemory ? new MemoryVerifiedUserRepo() : new VerifiedUserRepo();
 const otpSender = createOtpSender();
-const rate = new RateLimiter();
+const rate = useMemory ? new MemoryRateLimiter() : new RateLimiter();
 
 const UssdSchema = z.object({
 	// Africa's Talking style defaults; adjust per aggregator
