@@ -1,0 +1,18 @@
+import Redis from 'ioredis';
+export class RateLimiter {
+    constructor(url) {
+        this.redis = new Redis(url || process.env.REDIS_URL || 'redis://localhost:6379');
+    }
+    // Increment a counter with TTL, returns new count
+    async incr(key, ttlSec) {
+        const multi = this.redis.multi();
+        multi.incr(key);
+        multi.expire(key, ttlSec, 'NX');
+        const res = await multi.exec();
+        const count = res?.[0]?.[1] || 0;
+        return count;
+    }
+    async ttl(key) {
+        return this.redis.ttl(key);
+    }
+}
