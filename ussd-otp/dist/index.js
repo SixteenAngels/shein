@@ -5,14 +5,16 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { parsePhoneNumber } from 'libphonenumber-js';
 import { createOtpSender } from './otp/sender';
-import { MemorySessionStore } from './store/memory';
+import { RedisSessionStore } from './store/redis';
+import { VerifiedUserRepo } from './store/users';
 const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(morgan('dev'));
 const limiter = rateLimit({ windowMs: 60000, max: 60 });
 app.use('/ussd', limiter);
-const store = new MemorySessionStore({ ttlMs: 5 * 60000 });
+const store = new RedisSessionStore({ ttlMs: 5 * 60000 });
+const users = new VerifiedUserRepo();
 const otpSender = createOtpSender();
 const UssdSchema = z.object({
     // Africa's Talking style defaults; adjust per aggregator
@@ -51,6 +53,14 @@ app.post('/ussd', async (req, res) => {
         attempts: 0,
     };
     const parts = text.split('*').filter(Boolean);
+    // If user is already verified, skip OTP and enter authenticated menu immediately
+    if (session.state === 'INIT') {
+        if (await users.isVerified(phoneE164)) {
+            session.state = 'AUTHENTICATED';
+            await store.set(sessionId, session);
+            return res.type('text/plain').send(ussdResponse('Welcome back!\n1. Continue to app\n0. Exit'));
+        }
+    }
     // INIT: show welcome and trigger OTP send
     if (session.state === 'INIT') {
         const otp = genOtp();
@@ -60,13 +70,22 @@ app.post('/ussd', async (req, res) => {
         await store.set(sessionId, session);
         const channel = process.env.OTP_CHANNEL || 'sms';
         await otpSender.send({ to: phoneE164, otp, channel });
-        return res.type('text/plain').send(ussdResponse('Welcome to Ihsan. We sent you a 6-digit OTP.\nEnter OTP:'));
+        return res.type('text/plain').send(ussdResponse('Welcome to Ihsan. We sent you a 6-digit OTP.\nEnter OTP or 9 to resend:'));
     }
-    // WAITING_OTP: validate entered code
+    // WAITING_OTP: validate entered code (or resend)
     if (session.state === 'WAITING_OTP') {
         const input = parts.at(-1) ?? '';
+        if (input === '9') {
+            const otp = genOtp();
+            session.otp = otp;
+            session.attempts = 0;
+            await store.set(sessionId, session);
+            const channel = process.env.OTP_CHANNEL || 'sms';
+            await otpSender.send({ to: phoneE164, otp, channel });
+            return res.type('text/plain').send(ussdResponse('OTP resent. Enter 6-digit code:'));
+        }
         if (!/^\d{6}$/.test(input)) {
-            return res.type('text/plain').send(ussdResponse('Invalid OTP. Enter 6 digits:'));
+            return res.type('text/plain').send(ussdResponse('Invalid OTP. Enter 6 digits or 9 to resend:'));
         }
         if (session.otp !== input) {
             session.attempts += 1;
@@ -75,9 +94,10 @@ app.post('/ussd', async (req, res) => {
                 await store.delete(sessionId);
                 return res.type('text/plain').send(ussdResponse('Too many attempts. Try later.', true));
             }
-            return res.type('text/plain').send(ussdResponse('Incorrect OTP. Try again:'));
+            return res.type('text/plain').send(ussdResponse('Incorrect OTP. Try again or press 9 to resend:'));
         }
         session.state = 'AUTHENTICATED';
+        await users.add(phoneE164);
         await store.set(sessionId, session);
         return res.type('text/plain').send(ussdResponse('Authenticated!\n1. Continue to app\n0. Exit'));
     }

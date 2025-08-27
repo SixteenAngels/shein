@@ -5,16 +5,17 @@ A minimal USSD backend (Express + TypeScript) that sends OTPs to the user's phon
 ## Features
 
 - Africa's Talking–style USSD webhook (`POST /ussd`)
-- OTP generation and validation (6 digits)
+- OTP generation and validation (6 digits) with resend (press 9)
 - SMS via Twilio, Email via SMTP, or console fallback
-- In-memory session store with TTL and rate limiting
+- Redis-backed sessions and verified user persistence
+- Rate limiting
 
 ## Setup
 
 ```bash
 cd ussd-otp
 cp .env.example .env
-# Fill in TWILIO_* or SMTP_* creds in .env
+# Set REDIS_URL and TWILIO_*/SMTP_* credentials
 npm install
 npm run build
 npm start
@@ -27,17 +28,19 @@ npm start
 
 1. User dials your USSD code (e.g., *123#)
 2. Service sends a 6-digit OTP via SMS/Email
-3. User enters the OTP in the USSD session
-4. If correct: user sees "Continue"; otherwise, retry up to 3 times
+3. User enters the OTP in the USSD session (or presses 9 to resend)
+4. If correct: user is marked verified in Redis and sees "Continue" menu
+5. On subsequent sessions: verified users skip OTP and land on menu immediately
 
 ## Environment
 
 - `DEFAULT_REGION` (e.g., GH)
 - `OTP_CHANNEL` sms | email | console
+- `REDIS_URL` redis://...
 - Twilio: `TWILIO_SID`, `TWILIO_TOKEN`, `TWILIO_FROM`
 - SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
 
 ## Notes
 
-- Replace the in-memory store with Redis for production.
-- Add a persistent user store if you need to bind verified state to a user profile.
+- For production, deploy behind HTTPS and secure your aggregator IPs.
+- Extend verified persistence to a database if you need more user attributes.
