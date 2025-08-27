@@ -10,8 +10,7 @@ import { createOtpSender } from './otp/sender';
 import { RedisSessionStore } from './store/redis';
 import { VerifiedUserRepo } from './store/users';
 import { RateLimiter } from './store/rate';
-import { verifySignature, verifyTransaction, refund } from './payments/paystack';
-import { OrderRepo } from './store/orders';
+// OTP-only service: remove payment imports
 import { ipAllowlist } from './middleware/ipAllowlist';
 
 const app = express();
@@ -30,7 +29,6 @@ app.use('/ussd', limiter);
 const store = new RedisSessionStore({ ttlMs: 5 * 60_000 });
 const users = new VerifiedUserRepo();
 const otpSender = createOtpSender();
-const orders = new OrderRepo();
 const rate = new RateLimiter();
 
 const UssdSchema = z.object({
@@ -190,70 +188,7 @@ app.post('/ussd', async (req, res) => {
 	return res.type('text/plain').send(ussdResponse('Session error', true));
 });
 
-// Paystack webhook
-app.post('/webhooks/paystack', async (req, res) => {
-	const signature = req.headers['x-paystack-signature'];
-	const raw = req.body as Buffer;
-	if (!verifySignature(raw, signature)) {
-		return res.status(401).send('invalid signature');
-	}
-	try {
-		const event = JSON.parse(raw.toString('utf8'));
-		const reference: string | undefined = event?.data?.reference;
-		if (reference) {
-			if (event?.event === 'charge.success') {
-				await orders.setStatus(reference, 'payment_confirmed');
-			} else if (event?.event === 'charge.failed') {
-				await orders.setStatus(reference, 'failed');
-			}
-		}
-		return res.status(200).send('ok');
-	} catch (e) {
-		return res.status(400).send('bad payload');
-	}
-});
-
-// Paystack verify endpoint
-app.get('/api/payments/paystack/verify/:reference', async (req, res) => {
-	try {
-		const reference = req.params.reference;
-		const data = await verifyTransaction(reference);
-		if (data?.data?.status === 'success') {
-			await orders.setStatus(reference, 'payment_confirmed');
-		} else if (data?.data?.status === 'failed') {
-			await orders.setStatus(reference, 'failed');
-		}
-		return res.json(data);
-	} catch (e: any) {
-		return res.status(500).json({ error: e?.message || 'verify failed' });
-	}
-});
-
-// Finalize group buy outcome: refund or convert
-app.post('/api/group-buy/finalize', async (req, res) => {
-	// Expected payload: { action: 'refund'|'convert', references: string[] }
-	const action = req.body?.action as 'refund' | 'convert';
-	const references = (req.body?.references as string[]) || [];
-	if (!['refund','convert'].includes(action) || references.length === 0) {
-		return res.status(400).json({ error: 'invalid payload' });
-	}
-	try {
-		if (action === 'refund') {
-			for (const ref of references) {
-				await refund(ref);
-				await orders.setStatus(ref, 'failed');
-			}
-			return res.json({ ok: true });
-		}
-		// convert: mark payment_confirmed (already captured), subsequent fulfillment continues
-		for (const ref of references) {
-			await orders.setStatus(ref, 'payment_confirmed');
-		}
-		return res.json({ ok: true });
-	} catch (e: any) {
-		return res.status(500).json({ error: e?.message || 'finalize failed' });
-	}
-});
+// OTP-only: removed webhooks and payments endpoints
 
 const port = Number(process.env.PORT || 3000);
 app.listen(port, () => console.log(`USSD OTP service listening on :${port}`));
