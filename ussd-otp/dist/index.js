@@ -11,6 +11,7 @@ import { RedisSessionStore } from './store/redis';
 import { VerifiedUserRepo } from './store/users';
 import { RateLimiter } from './store/rate';
 import { verifySignature, verifyTransaction } from './payments/paystack';
+import { OrderRepo } from './store/orders';
 import { ipAllowlist } from './middleware/ipAllowlist';
 const app = express();
 // Raw body for Paystack webhooks; we mount JSON later
@@ -26,6 +27,7 @@ app.use('/ussd', limiter);
 const store = new RedisSessionStore({ ttlMs: 5 * 60000 });
 const users = new VerifiedUserRepo();
 const otpSender = createOtpSender();
+const orders = new OrderRepo();
 const rate = new RateLimiter();
 const UssdSchema = z.object({
     // Africa's Talking style defaults; adjust per aggregator
@@ -163,8 +165,15 @@ app.post('/webhooks/paystack', async (req, res) => {
     }
     try {
         const event = JSON.parse(raw.toString('utf8'));
-        // TODO: update order status by reference (event.data.reference)
-        // e.g., mark paid if event.event === 'charge.success'
+        const reference = event?.data?.reference;
+        if (reference) {
+            if (event?.event === 'charge.success') {
+                await orders.setStatus(reference, 'payment_confirmed');
+            }
+            else if (event?.event === 'charge.failed') {
+                await orders.setStatus(reference, 'failed');
+            }
+        }
         return res.status(200).send('ok');
     }
     catch (e) {
@@ -176,7 +185,12 @@ app.get('/api/payments/paystack/verify/:reference', async (req, res) => {
     try {
         const reference = req.params.reference;
         const data = await verifyTransaction(reference);
-        // TODO: update order status here if needed
+        if (data?.data?.status === 'success') {
+            await orders.setStatus(reference, 'payment_confirmed');
+        }
+        else if (data?.data?.status === 'failed') {
+            await orders.setStatus(reference, 'failed');
+        }
         return res.json(data);
     }
     catch (e) {
