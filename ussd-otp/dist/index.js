@@ -3,6 +3,7 @@ import express from 'express';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import hpp from 'hpp';
+import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { parsePhoneNumber } from 'libphonenumber-js';
@@ -20,6 +21,7 @@ app.use(express.json());
 app.use(morgan('dev'));
 app.use(helmet());
 app.use(hpp());
+app.use(cors({ origin: '*', methods: ['GET', 'POST'], allowedHeaders: ['Content-Type', 'x-ussd-secret'] }));
 app.use('/ussd', ipAllowlist());
 const limiter = rateLimit({ windowMs: 60000, max: 60 });
 app.use('/ussd', limiter);
@@ -54,6 +56,45 @@ function ussdResponse(text, end = false) {
 const DAILY_LIMIT = Number(process.env.OTP_DAILY_LIMIT || 5);
 const RESEND_HOURLY_LIMIT = Number(process.env.OTP_RESEND_HOURLY_LIMIT || 3);
 const RESEND_COOLDOWN_SEC = Number(process.env.OTP_RESEND_COOLDOWN_SEC || 60);
+// REST OTP for mobile app
+app.post('/api/otp/send', async (req, res) => {
+    const phone = req.body?.phone || '';
+    if (!phone)
+        return res.status(400).json({ error: 'phone required' });
+    const phoneE164 = toE164(phone);
+    const dailyKey = `otp:daily:${phoneE164}`;
+    const count = await rate.incr(dailyKey, 24 * 3600);
+    if (count > DAILY_LIMIT) {
+        const ttl = await rate.ttl(dailyKey);
+        return res.status(429).json({ error: 'limit', ttl });
+    }
+    const otp = genOtp();
+    await store.set(`rest:${phoneE164}`, { otp, attempts: 0 });
+    const channel = process.env.OTP_CHANNEL || 'sms';
+    await otpSender.send({ to: phoneE164, otp, channel });
+    await rate.incr(`otp:cooldown:${phoneE164}`, RESEND_COOLDOWN_SEC);
+    return res.json({ ok: true });
+});
+app.post('/api/otp/verify', async (req, res) => {
+    const phone = req.body?.phone || '';
+    const code = req.body?.code || '';
+    if (!phone || !/^\d{6}$/.test(code))
+        return res.status(400).json({ error: 'invalid' });
+    const phoneE164 = toE164(phone);
+    const rec = (await store.get(`rest:${phoneE164}`)) || { attempts: 0 };
+    if (!rec?.otp)
+        return res.status(400).json({ error: 'expired' });
+    if (rec.otp !== code) {
+        rec.attempts = (rec.attempts || 0) + 1;
+        await store.set(`rest:${phoneE164}`, rec);
+        if (rec.attempts >= 5)
+            await store.delete(`rest:${phoneE164}`);
+        return res.status(400).json({ error: 'mismatch' });
+    }
+    await users.add(phoneE164);
+    await store.delete(`rest:${phoneE164}`);
+    return res.json({ ok: true });
+});
 app.post('/ussd', async (req, res) => {
     // Optional secret check and IP allowlist
     const secret = process.env.USSD_SHARED_SECRET;

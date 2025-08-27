@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthProvider';
 import PaystackScreen from '../screens/PaystackScreen';
 import GroupBuyDetailScreen from '../screens/GroupBuyDetailScreen';
 import GroupBuyStartScreen from '../screens/GroupBuyStartScreen';
+import PhoneOtpScreen from '../screens/PhoneOtpScreen';
 
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -40,10 +41,17 @@ export function Tabs() {
 
 export default function RootNavigator() {
   const { user, loading } = useAuth();
-  if (loading) return null;
+  const [otpVerified, setOtpVerified] = React.useState<boolean | null>(null);
+  React.useEffect(() => {
+    (async () => {
+      const v = await import('@react-native-async-storage/async-storage').then(m => m.default.getItem('otpVerified'));
+      setOtpVerified((await v) === '1');
+    })();
+  }, []);
+  if (loading || otpVerified === null) return null;
   return (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>
-      {user ? (
+      {otpVerified ? (
         <>
           <RootStack.Screen name="Root" component={Tabs} />
           <RootStack.Screen name="Checkout" component={CheckoutScreen} />
@@ -53,7 +61,7 @@ export default function RootNavigator() {
           <RootStack.Screen name="GroupBuyStart" component={GroupBuyStartScreen} />
         </>
       ) : (
-        <RootStack.Screen name="Auth" component={AuthNavigator} />
+        <RootStack.Screen name="PhoneOtp" component={PhoneOtpScreen} />
       )}
       <RootStack.Screen name="TrackingMap" component={TrackingMapScreen} />
     </RootStack.Navigator>
