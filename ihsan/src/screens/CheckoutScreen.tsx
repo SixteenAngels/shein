@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useCartStore } from '../store/cart';
 
 export default function CheckoutScreen() {
   const { items, clear } = useCartStore();
   const [shipping, setShipping] = useState<'air-normal' | 'air-also' | 'sea'>('air-normal');
+  const navigation = useNavigation<any>();
 
   const total = useMemo(() => items.reduce((sum, i) => sum + i.product.price * i.quantity, 0), [items]);
 
@@ -32,8 +34,18 @@ export default function CheckoutScreen() {
         <Text className="text-lg font-bold mt-1">Total: ₵{total}</Text>
       </View>
 
-      <Pressable className="bg-[#ff3366] rounded-xl py-4 items-center" onPress={clear}>
-        <Text className="text-white font-semibold">Place Order</Text>
+      <Pressable
+        className="bg-[#ff3366] rounded-xl py-4 items-center"
+        onPress={() => {
+          const reference = `IH-${Date.now()}`;
+          navigation.navigate('Paystack', {
+            email: 'buyer@example.com',
+            amountKobo: Math.round(total * 100),
+            reference,
+          });
+        }}
+      >
+        <Text className="text-white font-semibold">Pay with Paystack</Text>
       </Pressable>
     </View>
   );
