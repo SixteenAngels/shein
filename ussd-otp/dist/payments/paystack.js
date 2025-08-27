@@ -21,3 +21,19 @@ export async function verifyTransaction(reference) {
     }
     return res.json();
 }
+export async function refund(reference) {
+    const secret = process.env.PAYSTACK_SECRET_KEY || '';
+    const res = await fetch(`https://api.paystack.co/refund`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${secret}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reference }),
+    });
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Paystack refund failed: ${res.status} ${text}`);
+    }
+    return res.json();
+}

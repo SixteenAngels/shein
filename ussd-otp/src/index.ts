@@ -10,7 +10,7 @@ import { createOtpSender } from './otp/sender';
 import { RedisSessionStore } from './store/redis';
 import { VerifiedUserRepo } from './store/users';
 import { RateLimiter } from './store/rate';
-import { verifySignature, verifyTransaction } from './payments/paystack';
+import { verifySignature, verifyTransaction, refund } from './payments/paystack';
 import { OrderRepo } from './store/orders';
 import { ipAllowlist } from './middleware/ipAllowlist';
 
@@ -226,6 +226,32 @@ app.get('/api/payments/paystack/verify/:reference', async (req, res) => {
 		return res.json(data);
 	} catch (e: any) {
 		return res.status(500).json({ error: e?.message || 'verify failed' });
+	}
+});
+
+// Finalize group buy outcome: refund or convert
+app.post('/api/group-buy/finalize', async (req, res) => {
+	// Expected payload: { action: 'refund'|'convert', references: string[] }
+	const action = req.body?.action as 'refund' | 'convert';
+	const references = (req.body?.references as string[]) || [];
+	if (!['refund','convert'].includes(action) || references.length === 0) {
+		return res.status(400).json({ error: 'invalid payload' });
+	}
+	try {
+		if (action === 'refund') {
+			for (const ref of references) {
+				await refund(ref);
+				await orders.setStatus(ref, 'failed');
+			}
+			return res.json({ ok: true });
+		}
+		// convert: mark payment_confirmed (already captured), subsequent fulfillment continues
+		for (const ref of references) {
+			await orders.setStatus(ref, 'payment_confirmed');
+		}
+		return res.json({ ok: true });
+	} catch (e: any) {
+		return res.status(500).json({ error: e?.message || 'finalize failed' });
 	}
 });
 

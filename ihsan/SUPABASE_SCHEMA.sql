@@ -67,6 +67,7 @@ create table if not exists group_buy_participants (
   user_id uuid references users(id),
   quantity int not null,
   unit_price numeric not null, -- captured at join time based on tier
+  payment_reference text, -- Paystack reference per participant payment
   payment_status text not null default 'pending', -- pending | paid | refunded
   created_at timestamptz default now()
 );
