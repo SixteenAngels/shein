@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import PaystackWebView from 'react-native-paystack-webview';
+import { Platform } from 'react-native';
 
 type Props = {
   route: any;
@@ -17,6 +18,9 @@ export default function PaystackScreen({ route, navigation }: Props) {
         paystackKey={publicKey}
         amount={amountKobo / 100}
         billingEmail={email}
+        billingName={Platform.OS === 'ios' ? 'Ihsan User' : undefined}
+        channels={['card', 'mobile_money']}
+        currency="GHS"
         activityIndicatorColor="#ff3366"
         onCancel={() => navigation.goBack()}
         onSuccess={({ data }) => {

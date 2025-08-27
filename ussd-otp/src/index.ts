@@ -10,9 +10,12 @@ import { createOtpSender } from './otp/sender';
 import { RedisSessionStore } from './store/redis';
 import { VerifiedUserRepo } from './store/users';
 import { RateLimiter } from './store/rate';
+import { verifySignature, verifyTransaction } from './payments/paystack';
 import { ipAllowlist } from './middleware/ipAllowlist';
 
 const app = express();
+// Raw body for Paystack webhooks; we mount JSON later
+app.use('/webhooks/paystack', express.raw({ type: '*/*' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(morgan('dev'));
@@ -183,6 +186,35 @@ app.post('/ussd', async (req, res) => {
 	}
 
 	return res.type('text/plain').send(ussdResponse('Session error', true));
+});
+
+// Paystack webhook
+app.post('/webhooks/paystack', async (req, res) => {
+	const signature = req.headers['x-paystack-signature'];
+	const raw = req.body as Buffer;
+	if (!verifySignature(raw, signature)) {
+		return res.status(401).send('invalid signature');
+	}
+	try {
+		const event = JSON.parse(raw.toString('utf8'));
+		// TODO: update order status by reference (event.data.reference)
+		// e.g., mark paid if event.event === 'charge.success'
+		return res.status(200).send('ok');
+	} catch (e) {
+		return res.status(400).send('bad payload');
+	}
+});
+
+// Paystack verify endpoint
+app.get('/api/payments/paystack/verify/:reference', async (req, res) => {
+	try {
+		const reference = req.params.reference;
+		const data = await verifyTransaction(reference);
+		// TODO: update order status here if needed
+		return res.json(data);
+	} catch (e: any) {
+		return res.status(500).json({ error: e?.message || 'verify failed' });
+	}
 });
 
 const port = Number(process.env.PORT || 3000);
