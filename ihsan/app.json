@@ -13,7 +13,30 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ihsan.app",
+      "buildNumber": "1.0.0",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We use your location to show delivery estimates and track orders on the map.",
+        "NSCameraUsageDescription": "We use the camera to scan product images and QR codes.",
+        "NSPhotoLibraryUsageDescription": "We need access to your photos to upload product images and receipts.",
+        "NSPhotoLibraryAddUsageDescription": "We save receipts and images to your photo library when you request it.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSExceptionDomains": {
+            "supabase.co": {
+              "NSIncludesSubdomains": true,
+              "NSTemporaryExceptionAllowsInsecureHTTPLoads": false,
+              "NSExceptionRequiresForwardSecrecy": true
+            },
+            "tile.openstreetmap.org": {
+              "NSIncludesSubdomains": true,
+              "NSTemporaryExceptionAllowsInsecureHTTPLoads": false,
+              "NSExceptionRequiresForwardSecrecy": true
+            }
+          }
+        }
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -27,7 +50,19 @@
         "ACCESS_FINE_LOCATION"
       ]
     },
-    "plugins": [["expo-location"], ["expo-notifications"]],
+    "scheme": "ihsan",
+    "plugins": [
+      [
+        "expo-location"
+      ],
+      [
+        "expo-notifications"
+      ],
+      [
+        "expo-image-picker"
+      ],
+      "expo-secure-store"
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     },
