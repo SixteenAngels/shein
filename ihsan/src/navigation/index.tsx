@@ -7,6 +7,10 @@ import HomeScreen from '../screens/HomeScreen';
 import CartScreen from '../screens/CartScreen';
 import OrdersScreen from '../screens/OrdersScreen';
 import AccountScreen from '../screens/AccountScreen';
+import CheckoutScreen from '../screens/CheckoutScreen';
+import AuthNavigator from './AuthNavigator';
+import BuyNowModal from '../screens/BuyNowModal';
+import { useAuth } from '../context/AuthProvider';
 
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -32,9 +36,19 @@ export function Tabs() {
 }
 
 export default function RootNavigator() {
+  const { user, loading } = useAuth();
+  if (loading) return null;
   return (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>
-      <RootStack.Screen name="Root" component={Tabs} />
+      {user ? (
+        <>
+          <RootStack.Screen name="Root" component={Tabs} />
+          <RootStack.Screen name="Checkout" component={CheckoutScreen} />
+          <RootStack.Screen name="BuyNow" component={BuyNowModal} />
+        </>
+      ) : (
+        <RootStack.Screen name="Auth" component={AuthNavigator} />
+      )}
       <RootStack.Screen name="TrackingMap" component={TrackingMapScreen} />
     </RootStack.Navigator>
   );

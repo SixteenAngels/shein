@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Dimensions, FlatList } from 'react-native';
 import ProductCard, { Product } from '../components/ProductCard';
 import ProductPreviewModal from './ProductPreviewModal';
 import ChatBubble from '../components/ChatBubble';
 import { useCartStore } from '../store/cart';
+import { fetchProducts } from '../services/products';
 
 export default function HomeScreen() {
   const [preview, setPreview] = useState<Product | null>(null);
@@ -11,16 +12,21 @@ export default function HomeScreen() {
   const numColumns = 2;
   const cardWidth = Dimensions.get('window').width / numColumns - 18;
 
-  const data: Product[] = useMemo(() => (
-    Array.from({ length: 20 }).map((_, i) => ({
-      id: `p-${i+1}`,
-      name: `Product ${i+1}`,
-      imageUrl: `https://picsum.photos/seed/${i+1}/600/800`,
-      price: Math.round(50 + Math.random()*200),
-      isReadyNow: i % 3 === 0,
-      isGroupBuy: i % 4 === 0,
-    }))
-  ), []);
+  const [data, setData] = useState<Product[]>([]);
+  useEffect(() => {
+    (async () => {
+      const rows = await fetchProducts({});
+      const mapped: Product[] = rows.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        imageUrl: r.image_url,
+        price: r.price,
+        isReadyNow: !!r.ready_now,
+        isGroupBuy: !!r.group_buy_enabled,
+      }));
+      setData(mapped);
+    })();
+  }, []);
 
   return (
     <View className="flex-1 bg-white">

@@ -1,5 +1,5 @@
 import React from 'react';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import { View } from 'react-native';
 
 type Props = {
@@ -17,7 +17,14 @@ export default function TrackingMapScreen({ route }: Props) {
 
   return (
     <View className="flex-1">
-      <MapView style={{ flex: 1 }} provider={PROVIDER_GOOGLE} initialRegion={region}>
+      <MapView style={{ flex: 1 }} initialRegion={region}>
+        <UrlTile
+          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maximumZ={19}
+          flipY={false}
+          tileSize={256}
+          shouldReplaceMapContent
+        />
         <Marker coordinate={coords} />
         {path.length > 1 && (
           <Polyline coordinates={path} strokeColor="#ff3366" strokeWidth={3} />

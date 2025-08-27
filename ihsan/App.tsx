@@ -5,6 +5,7 @@ import { Text, View } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import RootNavigator from './src/navigation';
+import { AuthProvider } from './src/context/AuthProvider';
 import "./global.css";
 
 const queryClient = new QueryClient();
@@ -27,7 +28,9 @@ export default function App() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <NavigationContainer theme={AppTheme}>
-            <RootNavigator />
+            <AuthProvider>
+              <RootNavigator />
+            </AuthProvider>
           </NavigationContainer>
           <StatusBar style="dark" />
         </QueryClientProvider>
